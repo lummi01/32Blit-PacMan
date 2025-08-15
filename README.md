@@ -2,7 +2,7 @@
 # PacMan
 Arcade clone for the fantastic 32Blit Console.<BR>
 
-![](/assets/screenshot.bmp)<BR>
+![](/assets/screenshot.png)<BR>
 <BR>
 Try it out and have fun...<BR>
 <BR>
