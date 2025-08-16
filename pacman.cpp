@@ -362,8 +362,8 @@ void render(uint32_t time_ms){
         for(short i=0; i<p.life; i++) // life
             screen.sprite(107, Point(8 + (i * 4) + CENTER, 232));
 
-        screen.pen = Pen(255, 255, 255);
-        screen.text(std::to_string(game.dots), minimal_font, Point(232 + CENTER, 232), true, TextAlign::top_right);
+//        screen.pen = Pen(255, 255, 255);
+//        screen.text(std::to_string(game.dots), minimal_font, Point(232 + CENTER, 232), true, TextAlign::top_right);
 
 
 /*
@@ -419,3 +419,4 @@ void update(uint32_t time){
         }
     }
 }
+
