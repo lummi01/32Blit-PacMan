@@ -1,6 +1,6 @@
 ![](/assets/image.png)
 # PacMan
-v.0.0.3<BR>
+v.0.0.6<BR>
 Arcade clone for the fantastic 32Blit Console.<BR>
 
 ![](/assets/screenshot.png)<BR>
