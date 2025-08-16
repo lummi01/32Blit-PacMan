@@ -18,6 +18,7 @@ struct GAME
     short ani;
     short died_ani;
     short cockies;
+    bool gate_open;
 };
 
 struct PLAYER
@@ -47,6 +48,7 @@ Timer ani_timer;
 Timer fear_timer;
 Timer end_fear_timer;
 Timer died_timer;
+Timer gate_timer;
 
 void start();
 
@@ -87,14 +89,19 @@ void UpdateDied(Timer &t){
         p.delta_pos = Point(0, 0);
         p.dir = 4; 
 
-        for (short g=0; g<4; g++){
-            ghost[g].dir = 1;
-            ghost[g].grid_pos = Point(10 + (g * 3), 10);
-            ghost[g].delta_pos = Vec2(24 - (g * 6), 0);
-        }
+    for (short g=0; g<4; g++){
+        ghost[g].dir = 1;
+        ghost[g].grid_pos = Point(13, 13);
+        ghost[g].delta_pos = Vec2(g * 6, 0);
+        ghost[g].state = 4;
+    }
 
         game.state = 1;
     }
+}
+
+void UpdateGate(Timer &t){
+    game.gate_open = true;
 }
 
 bool collision(float x, float y){
@@ -167,12 +174,27 @@ void UpdateGhost(){
             short x = ghost[g].grid_pos.x;
             short y = ghost[g].grid_pos.y;
 
-            if(ghost[g].state == 3 && x == 10 && y == 13)
-                ghost[g].state = 0;            
             if(x < 1)
                 ghost[g].grid_pos.x = 28;
             else if(x > 28)
                 ghost[g].grid_pos.x = 1;
+            else if(ghost[g].state == 3 && x == 10 && y == 13)
+                ghost[g].dir = 1;
+            else if(ghost[g].state == 3 && x == 13 && y == 13){
+                ghost[g].state = 4;
+                game.gate_open = false;
+            }
+            else if(ghost[g].state == 4){
+                if(game.gate_open && fear_timer.is_running() == false && end_fear_timer.is_running() == false){
+                    game.gate_open = false;
+                    ghost[g].state = 0;
+                }
+                else{
+                    ghost[g].dir += 2;
+                    if(ghost[g].dir > 3)
+                        ghost[g].dir -= 4;
+                }
+            }            
             else{
                 float value = 999;
                 short newdir = ghost[g].dir;
@@ -235,8 +257,9 @@ void start(){
 
     for (short g=0; g<4; g++){
         ghost[g].dir = 1;
-        ghost[g].grid_pos = Point(10 + (g * 3), 10);
-        ghost[g].delta_pos = Vec2(24 - (g * 6), 0);
+        ghost[g].grid_pos = Point(13, 13);
+        ghost[g].delta_pos = Vec2(g * 6, 0);
+        ghost[g].state = 4;
     }
 
     game.state = 1;
@@ -253,10 +276,14 @@ void init(){
     ani_timer.start();
 
     fear_timer.init(UpdateFear, 4500, 1);
+//    fear_timer.stop();
     end_fear_timer.init(UpdateEndFear, 1500, 1);
+//    end_fear_timer.stop();
 
     died_timer.init(UpdateDied, 150, -1);
 
+    gate_timer.init(UpdateGate, 1500, -1);
+    gate_timer.start();
 
     start();
 }
@@ -298,7 +325,7 @@ void render(uint32_t time_ms){
                               Point(ghost[g].grid_pos.x * 8 + ghost[g].delta_pos.x - 4 + CENTER, ghost[g].grid_pos.y * 8 + ghost[g].delta_pos.y - 4));
             }
             else{
-                if(ghost[g].state == 0){ // normal
+                if(ghost[g].state == 0 || ghost[g].state == 4){ // normal
                     screen.sprite(Rect((g * 4) + gs[game.ani], 7, 2, 2), 
                                   Point(ghost[g].grid_pos.x * 8 + ghost[g].delta_pos.x - 4 + CENTER, ghost[g].grid_pos.y * 8 + ghost[g].delta_pos.y - 4));
                 }
