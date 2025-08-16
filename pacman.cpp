@@ -14,11 +14,9 @@ struct GAME
     short state;
     short map[30][30];
     float ghost_dir[30][30];
-    float ghost_speed = .5f;
     short ani;
-    short died_ani;
-    short cockies;
-    bool gate_open;
+    short dots;
+    short level;
 };
 
 struct PLAYER
@@ -29,6 +27,8 @@ struct PLAYER
     Point grid_pos;
     short dir;
     short life;
+    int score;
+    short died_ani;
 };
 
 struct GHOST
@@ -48,7 +48,8 @@ Timer ani_timer;
 Timer fear_timer;
 Timer end_fear_timer;
 Timer died_timer;
-Timer gate_timer;
+Tween gate_tween;
+Tween fruit_tween;
 
 void start();
 
@@ -79,29 +80,28 @@ void UpdateEndFear(Timer &t){
 }
 
 void UpdateDied(Timer &t){
-    game.died_ani++;
-    if(game.died_ani == 10){
-        game.died_ani = 0;
+    p.died_ani++;
+    if(p.died_ani == 10){
+        p.died_ani = 0;
         died_timer.stop();
+        p.life--;
+        if(p.life == 0)
+            game.state = 0;
+        else{
+            p.sprite = 1;
+            p.grid_pos = Point(14, 22);
+            p.delta_pos = Point(0, 0);
+            p.dir = 4; 
 
-        p.sprite = 1;
-        p.grid_pos = Point(14, 22);
-        p.delta_pos = Point(0, 0);
-        p.dir = 4; 
-
-    for (short g=0; g<4; g++){
-        ghost[g].dir = 1;
-        ghost[g].grid_pos = Point(13, 13);
-        ghost[g].delta_pos = Vec2(g * 6, 0);
-        ghost[g].state = 4;
+            for (short g=0; g<4; g++){
+                ghost[g].dir = 1;
+                ghost[g].grid_pos = Point(13, 13);
+                ghost[g].delta_pos = Vec2(g * 6, 0);
+                ghost[g].state = 4;
+            }
+            game.state = 1;
+        }
     }
-
-        game.state = 1;
-    }
-}
-
-void UpdateGate(Timer &t){
-    game.gate_open = true;
 }
 
 bool collision(float x, float y){
@@ -133,11 +133,15 @@ void UpdateControl(){
             p.grid_pos.x = 0;
         else if(p.grid_pos.x < 1)
             p.grid_pos.x = 29;
-        else if(game.map[p.grid_pos.x][p.grid_pos.y] == 1){ // cockies
+        else if(game.map[p.grid_pos.x][p.grid_pos.y] == 1){ // dots
             game.map[p.grid_pos.x][p.grid_pos.y] = 0;
-            game.cockies--;
-            if(game.cockies == 0)
+            game.dots--;
+            if(game.dots == 100)
+                fruit_tween.start();
+            else if(game.dots == 0){
+                game.level++;
                 start();
+            }
         }
         else if(game.map[p.grid_pos.x][p.grid_pos.y] == 2){ // pill
             game.map[p.grid_pos.x][p.grid_pos.y] = 0;
@@ -164,9 +168,12 @@ void UpdateControl(){
 
 void UpdateGhost(){
     Point dir[4] = {Point(0, -1), Point(1, 0), Point(0, 1), Point(-1, 0)};
+    float speed = (4 + game.level) * .1f;
+    if(speed > .8f)
+        speed = .8f;
 
     for(short g=0; g<4; g++){ 
-       ghost[g].delta_pos += Vec2(dir[ghost[g].dir].x * game.ghost_speed, dir[ghost[g].dir].y * game.ghost_speed);
+       ghost[g].delta_pos += Vec2(dir[ghost[g].dir].x * speed, dir[ghost[g].dir].y * speed);
         if(ghost[g].delta_pos == Vec2(dir[ghost[g].dir].x * 24, dir[ghost[g].dir].y * 24)){
             ghost[g].delta_pos = Vec2(0, 0);
             ghost[g].grid_pos += (dir[ghost[g].dir] * 3);
@@ -182,11 +189,11 @@ void UpdateGhost(){
                 ghost[g].dir = 1;
             else if(ghost[g].state == 3 && x == 13 && y == 13){
                 ghost[g].state = 4;
-                game.gate_open = false;
+                gate_tween.start();
             }
             else if(ghost[g].state == 4){
-                if(game.gate_open && fear_timer.is_running() == false && end_fear_timer.is_running() == false){
-                    game.gate_open = false;
+                if(gate_tween.value > 1000 && fear_timer.is_running() == false && end_fear_timer.is_running() == false){
+                    gate_tween.start();
                     ghost[g].state = 0;
                 }
                 else{
@@ -229,15 +236,16 @@ void UpdateGhost(){
 }
 
 void start(){
+    game.dots = 0;
+
 // Load the map data from the map memory
     TMX *tmx = (TMX *)asset_tilemap;
-
     for(short y = 0; y < 30; y++){
         for(short x = 0; x < 30; x++){
             short tile = tmx->data[y * 32 + x - 16];
             if(tile == 105){ // video waffel
                 game.map[x][y] = 1;
-                game.cockies++;
+                game.dots++;
             }
             else if(tile == 106) // pill
                 game.map[x][y] = 2;
@@ -261,8 +269,6 @@ void start(){
         ghost[g].delta_pos = Vec2(g * 6, 0);
         ghost[g].state = 4;
     }
-
-    game.state = 1;
 }
 
 // init
@@ -275,17 +281,16 @@ void init(){
     ani_timer.init(UpdateAni, 75, -1);
     ani_timer.start();
 
-    fear_timer.init(UpdateFear, 4500, 1);
-//    fear_timer.stop();
-    end_fear_timer.init(UpdateEndFear, 1500, 1);
-//    end_fear_timer.stop();
+    fear_timer.init(UpdateFear, 4000, 1);
+
+    end_fear_timer.init(UpdateEndFear, 1000, 1);
 
     died_timer.init(UpdateDied, 150, -1);
 
-    gate_timer.init(UpdateGate, 1500, -1);
-    gate_timer.start();
+    gate_tween.init(tween_linear, 0, 2000, 2000, -1);
+    gate_tween.start();
 
-    start();
+    fruit_tween.init(tween_linear, 0, 1, 6000, 1);
 }
 
 // render
@@ -298,8 +303,9 @@ void render(uint32_t time_ms){
     screen.mask = nullptr;
 
     if(game.state == 0){
-        screen.pen = Pen(200, 200, 200);
-        screen.text("PRESS X TO START", minimal_font, Point(80, 114), true, TextAlign::top_center);
+        screen.sprite(Rect(0, 13, 16, 3), Point(56 + CENTER, 108));
+        screen.pen = Pen(255, 255, 255);
+        screen.text("PRESS X TO START", minimal_font, Point(120 + CENTER, 200), true, TextAlign::top_center);
     }
     else{
         map->draw(&screen, Rect(CENTER, 0, 240, 240), callback); // map
@@ -313,6 +319,9 @@ void render(uint32_t time_ms){
                     screen.sprite(pill_ani[game.ani], Point(x * 8 + CENTER, y * 8));
             }
         }
+
+        if(fruit_tween.is_running())
+            screen.sprite(Rect(game.level * 2, 11, 2, 2), Point(112 + CENTER, 124));
 
         short gs[6] = {0, 2, 0, 2, 4, 6};
         for(short g=0; g<4; g++){
@@ -346,26 +355,22 @@ void render(uint32_t time_ms){
             Point died[10] = {Point(0, 4), Point(2, 2), Point(0, 2), Point(2, 4),
                                 Point(4, 4), Point(6, 4), Point(8, 4), Point(10, 4),
                                 Point(12, 4), Point(14, 4)};
-            screen.sprite(Rect(died[game.died_ani].x, died[game.died_ani].y, 2, 2), 
+            screen.sprite(Rect(died[p.died_ani].x, died[p.died_ani].y, 2, 2), 
                           Point(p.grid_pos.x * 8 + p.delta_pos.x - 4 + CENTER, p.grid_pos.y * 8 + p.delta_pos.y - 4));
         }
 
+        for(short i=0; i<p.life; i++) // life
+            screen.sprite(107, Point(8 + (i * 4) + CENTER, 232));
+
+        screen.pen = Pen(255, 255, 255);
+        screen.text(std::to_string(game.dots), minimal_font, Point(232 + CENTER, 232), true, TextAlign::top_right);
+
 
 /*
-        screen.pen = Pen(255, 255, 255);
-        for(int y=1; y<30; y+=3){
-            for(int x=1; x<30; x+=3){
-                screen.text(std::to_string(int(game.ghost_dir[x][y])), minimal_font, Point(x * 8, y * 8), true, TextAlign::top_left);
-            }
-        }
 
         if(game.state == 4){ // game over
             screen.pen = Pen(255, 255, 255);
             screen.text("GAME OVER", font, Point(80, 56), true, TextAlign::center_center);
-        }
-        else{
-            for(short i=0; i<p.life; i++) // life
-                screen.sprite(147, Point(16 + (i * 5), 114));
         }
 */
     }
@@ -380,6 +385,10 @@ void render(uint32_t time_ms){
 void update(uint32_t time){
     if(game.state == 0){ // title
         if(buttons.released & Button::A){
+            p.life = 3;
+            p.score = 0;
+            game.level = 0;
+            start();
             game.state = 1;
         }
     }
@@ -398,12 +407,14 @@ void update(uint32_t time){
                 }
             }
         }
-    }
-    else if(game.state == 2){ // died
+
+        if(fruit_tween.is_running() && collision(116, 128)){
+            fruit_tween.stop();
+        }
+        
     }
     else if(game.state == 3){ // game over
         if(buttons.released & Button::A){
-            start();
             game.state = 0;
         }
     }
