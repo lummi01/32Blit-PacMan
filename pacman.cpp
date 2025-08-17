@@ -293,18 +293,17 @@ void start(){
     for(short y = 0; y < 30; y++){
         for(short x = 0; x < 30; x++){
             short tile = tmx->data[y * 32 + x - 16];
-            if(tile == 105){ // video waffel
-                game.map[x][y] = 1;
+            if(tile == 104) // empty
+                game.map[x][y] = 0;
+            else if(tile == 105){
+                game.map[x][y] = 1; // dot
                 game.dots++;
             }
-            else if(tile == 106) // pill
-                game.map[x][y] = 2;
-            else if(tile == 107) // blockade
-                game.map[x][y] = 3;
-            else if(tile < 32) // wall
-                game.map[x][y] = 4;
-            else // empty
-                game.map[x][y] = 0;
+            else if(tile == 106)
+                game.map[x][y] = 2; // pill
+            else
+                game.map[x][y] = 3; // wall
+
         }
     }            
 
